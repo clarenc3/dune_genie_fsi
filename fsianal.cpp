@@ -27,23 +27,41 @@ void SetCustomPalette() {
 
 double GetMeMyIntegral(TH1D *Hist, int order) {
   double sum = 0.0;
-  double counts = 0;
   for (int i = 0; i < Hist->GetXaxis()->GetNbins(); ++i) {
-    double x = Hist->GetXaxis()->GetBinCenter(i+1);
+    /// Only go up until 1.2 Eav/q0
+    double x = 1.0;
     // Multiple the order
-    for (int j = 1; j < order; ++j) {
-      x = x*x;
+    int counter = 0;
+    for (int j = 0; j < order; ++j) {
+      counter++;
+      x *= Hist->GetXaxis()->GetBinCenter(i+1);
     }
     double func = Hist->GetBinContent(i+1);
     sum += x*func;
-    counts += func;
   }
-  //sum = sum/counts;
-  // Compare to the mean
+
   /*
-  if (order == 1 && sum != Hist->GetMean()) { 
+  // Let's run a debug
+  // Get the counts to make a pdf
+  double integral = 0.0;
+  for (int i = 0; i < Hist->GetXaxis()->GetNbins(); ++i) {
+    integral += Hist->GetBinContent(i+1);
+  }
+
+  // Get the mean
+  double mu = Hist->GetMean();
+  // Get the standard deviation
+  double stddev = sqrt(sum/integral - mu*mu);
+
+  // Can compare to the mean and std dev from the ROOT functions
+  if (order == 1 && mu != Hist->GetMean()) { 
     std::cerr << "EEK" << std::endl;
-    std::cerr << "calc: " << sum << " mean: " << Hist->GetMean() << std::endl;
+    std::cerr << "calc: " << mu << " mean: " << Hist->GetMean() << std::endl;
+    throw;
+  } else if (order == 2 && stddev != Hist->GetRMS()) { 
+    std::cerr << "EEK" << std::endl;
+    std::cerr << "calc: " << stddev << " stddev: " << Hist->GetRMS() << std::endl;
+    //throw;
   }
   */
 
@@ -96,7 +114,7 @@ void fsianal(std::string filename) {
   std::cout << "Scalefactor: " << MinScale << std::endl;
 
   const int nbins = 100;
-  TH3D *plot = new TH3D("q0q3Eav", "q0q3Eav", nbins, 0, 2.0, nbins, 0, 2.0, 24, 0, 1.2);
+  TH3D *plot = new TH3D("q0q3Eav", "q0q3Eav", nbins, 0, 2.0, nbins, 0, 2.0, 24, 0, 1.0);
   plot->GetXaxis()->SetTitle("q_{3} (GeV)");
   plot->GetYaxis()->SetTitle("q_{0} (GeV)");
   plot->GetZaxis()->SetTitle("E_{av}/q_{0}");
@@ -109,7 +127,7 @@ void fsianal(std::string filename) {
   const int nModesTotal = 6;
   TH3D *plotMode[nModesTotal];
   for (int i = 0; i < nModesTotal; ++i) {
-    plotMode[i] = new TH3D(Form("q0q3Eav_%i", i), Form("q0q3Eav_%i", i), nbins, 0, 2.0, nbins, 0, 2.0, 24, 0, 1.2);
+    plotMode[i] = new TH3D(Form("q0q3Eav_%i", i), Form("q0q3Eav_%i", i), nbins, 0, 2.0, nbins, 0, 2.0, 24, 0, 1.0);
   }
 
   int ncc = 0;
@@ -148,42 +166,10 @@ void fsianal(std::string filename) {
     plotMode[i]->Scale(MinScale);
   }
 
-  /*
-  const int nbins = 100;
-  TH3D *plot = new TH3D("q0q3Eav", "q0q3Eav", nbins, 0, 2.0, nbins, 0, 2.0, 24, 0, 1.2);
-  plot->GetXaxis()->SetTitle("q_{3} (GeV)");
-  plot->GetYaxis()->SetTitle("q_{0} (GeV)");
-  plot->GetZaxis()->SetTitle("E_{av}/q_{0}");
-
-  TH2D *plot2d = new TH2D("q0q3", "q0q3", nbins, 0, 2.0, nbins, 0, 2.0);
-  plot2d->GetXaxis()->SetTitle("q_{3} (GeV)");
-  plot2d->GetYaxis()->SetTitle("q_{0} (GeV)");
-  plot2d->GetZaxis()->SetTitle("d#sigma/dq_{3}dq_{0} (cm^{2}/nucleon/GeV/GeV)");
-
-  const int nModesTotal = 6;
-  TH3D *plotMode[nModesTotal];
-  for (int i = 0; i < nModesTotal; ++i) {
-    plotMode[i] = new TH3D(Form("q0q3Eav_%i", i), Form("q0q3Eav_%i", i), nbins, 0, 2.0, nbins, 0, 2.0, 24, 0, 1.2);
-  }
-
-  for (int i = 0; i < nbins; ++i) {
-    for (int j = 0; j < nbins; ++j) {
-      if (i > j) {
-        plot2d->SetBinContent(i+1, j+1, 1E-45);
-        for (int k = 0; k < 24; ++k) {
-          plot->SetBinContent(i+1, j+1, k+1, 1E-45);
-          for (int z = 0; z < nModesTotal; ++z) {
-            plotMode[z]->SetBinContent(i+1, j+1, k+1, 1E-45);
-          }
-        }
-      }
-    }
-  }
-  */
-
   std::string canvname = filename;
   //std::string canvname = "Flat.root";
   canvname = canvname.substr(0, canvname.find(".root"));
+  canvname += "_UpTo1GeV_NoIntCut";
   //canvname += "_Flat";
   TCanvas *canv = new TCanvas("canv", "canv", 1024, 1024);
   canv->SetLeftMargin(canv->GetLeftMargin()*1.25);
@@ -325,7 +311,7 @@ void fsianal(std::string filename) {
       leg2->AddEntry("", Form("Skew=%.2f", skew), "");
 
       canv->Clear();
-      TH1D *fill = new TH1D("fill", "fill", 500, 0, 1.2);
+      TH1D *fill = new TH1D("fill", "fill", 500, 0, 1.0);
       for (int k = 0; k < fill->GetNbinsX()+1; ++k) {
         if (fill->GetBinCenter(k+1) >= mean-sqrt(rms) && fill->GetBinCenter(k+1) <= mean+sqrt(rms)) fill->SetBinContent(k+1, one_d->GetMaximum());
       }
@@ -361,7 +347,7 @@ void fsianal(std::string filename) {
   gStyle->SetPalette(55);
   // Now do the Mean and RMS
   canv->Clear();
-  MeanPlot->SetMaximum(1.2);
+  MeanPlot->SetMaximum(1.0);
   MeanPlot->SetMinimum(0);
   MeanPlot->Draw("colz");
   canv->SetRightMargin(canv->GetRightMargin()*1.7);
@@ -415,6 +401,7 @@ void fsianal(std::string filename) {
   ThirdPlot->Write();
   FourthPlot->Write();
 
+  std::cout << "Finished and wrote to " << OutputFile->GetName() << " and " << canvname << ".pdf" << std::endl;
   OutputFile->Close();
 
   canv->Print((canvname+".pdf]").c_str());

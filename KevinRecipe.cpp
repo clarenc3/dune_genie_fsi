@@ -6,7 +6,7 @@ const double Shift = -999;
 double WeightSecondOrder(double xvar, double a0, double a1, double a2) {
 
   double w=a0+a1*xvar+a2*xvar*xvar;
-  if (w < 0) return 0.0;
+  //if (w < 0) return 0.0;
   return a0+a1*xvar+a2*xvar*xvar;
 }
 
@@ -278,12 +278,12 @@ void KevinRecipe(std::string file1, std::string file2, std::string file3) {
   TH1::AddDirectory(false);
 
   std::string MeanName = "MeanPlot";
-  double meanshift = 0.1;
+  double meanshift = 0.4;
   // Get the shifted mean histogram
   TH2D *MeanHist = SubtractAndAddHist(file1, file2, file3, meanshift, MeanName);
 
   std::string VarName = "RMSPlot";
-  double varshift = 0.1;
+  double varshift = 0.4;
   // Get the shifted variance histogram
   TH2D *VarHist = SubtractAndAddHist(file1, file2, file3, varshift, VarName);
 
@@ -318,7 +318,12 @@ void KevinRecipe(std::string file1, std::string file2, std::string file3) {
 
   // Now have the difference in Mean (0th moment), Variance (1st moment), Skew (2nd moment)
   //TFile *Output = new TFile(Form("%s_Subtract%.2f_%s", file1.c_str(), Shift, file2.c_str()), "RECREATE");
-  TFile *Output = new TFile(Form("FSI_Weights_MeanShift%.2f_VarShift%.2f.root", meanshift, varshift), "RECREATE");
+  std::string canvname = "FULL_validation_new_";
+  stringstream ss;
+  ss << "MeanShift_" << meanshift << "_VarShift_" << varshift;
+  canvname += ss.str();
+
+  TFile *Output = new TFile((canvname+".root").c_str(), "RECREATE");
   Output->cd();
   MeanHist->Write();
   VarHist->Write();
@@ -347,10 +352,6 @@ void KevinRecipe(std::string file1, std::string file2, std::string file3) {
   canv->SetRightMargin(canv->GetRightMargin()*0.8);
   canv->SetLeftMargin(canv->GetLeftMargin()*1.1);
   canv->SetBottomMargin(canv->GetBottomMargin()*0.8);
-  std::string canvname = "FULL_validation_";
-  stringstream ss;
-  ss << "MeanShift_" << meanshift << "_VarShift_" << varshift;
-  canvname += ss.str();
   canv->Print((canvname+".pdf[").c_str());
 
   //TLegend *leg = new TLegend(0.05, 0.4, 0.4, 0.95);
@@ -405,6 +406,7 @@ void KevinRecipe(std::string file1, std::string file2, std::string file3) {
         if (a0 == -999.99 || a1 == -999.99 || a2 == -999.99) {
           weight = 1.0;
         }
+
         double content = FSIPlot1D_Ar->GetBinContent(k+1)*weight;
         if (weight == 0 && FSIPlot1D_C->Integral() > 0 && FSIPlot1D_Ar->Integral() > 0) {
           std::cout << "Found zero weight: " << std::endl;
@@ -473,7 +475,13 @@ void KevinRecipe(std::string file1, std::string file2, std::string file3) {
       if (maximum < FSIPlot1D_Weighted->GetMaximum()) maximum = FSIPlot1D_Weighted->GetMaximum();
       if (maximum < NoFSIPlot1D_C->GetMaximum()) maximum = NoFSIPlot1D_C->GetMaximum();
       maximum *= 1.3;
-      FSIPlot1D_Ar->GetYaxis()->SetRangeUser(0, maximum);
+      // Find minimum
+      double minimum = 0.0;
+      if (minimum > FSIPlot1D_Ar->GetMinimum()) minimum = FSIPlot1D_Ar->GetMinimum();
+      if (minimum > FSIPlot1D_Weighted->GetMinimum()) minimum = FSIPlot1D_Weighted->GetMinimum();
+      if (minimum > NoFSIPlot1D_C->GetMinimum()) minimum = NoFSIPlot1D_C->GetMinimum();
+      minimum *= 1.3;
+      FSIPlot1D_Ar->GetYaxis()->SetRangeUser(minimum, maximum);
 
       canv->Clear();
       FSIPlot1D_Ar->Draw();
