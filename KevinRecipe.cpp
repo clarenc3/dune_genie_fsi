@@ -147,14 +147,6 @@ TH2D** SolveSystem(TH2D* MuHist, TH2D* VarHist, TH2D* ZeroHist, TH2D* FirstHist,
       double mu = MuHist->GetBinContent(i+1,j+1);
       // Variance
       double var = VarHist->GetBinContent(i+1,j+1);
-      /*
-      if (mu == 0 || var == 0) {
-        A0Hist->SetBinContent(i+1, j+1, 0);
-        A1Hist->SetBinContent(i+1, j+1, 0);
-        A2Hist->SetBinContent(i+1, j+1, 0);
-        continue;
-      }
-      */
 
       // Integral[x^0 * f(x)dx]
       double zeroth = ZeroHist->GetBinContent(i+1, j+1);
@@ -278,12 +270,12 @@ void KevinRecipe(std::string file1, std::string file2, std::string file3) {
   TH1::AddDirectory(false);
 
   std::string MeanName = "MeanPlot";
-  double meanshift = 0.4;
+  double meanshift = 0.3;
   // Get the shifted mean histogram
   TH2D *MeanHist = SubtractAndAddHist(file1, file2, file3, meanshift, MeanName);
 
   std::string VarName = "RMSPlot";
-  double varshift = 0.4;
+  double varshift = 0.3;
   // Get the shifted variance histogram
   TH2D *VarHist = SubtractAndAddHist(file1, file2, file3, varshift, VarName);
 
@@ -318,7 +310,7 @@ void KevinRecipe(std::string file1, std::string file2, std::string file3) {
 
   // Now have the difference in Mean (0th moment), Variance (1st moment), Skew (2nd moment)
   //TFile *Output = new TFile(Form("%s_Subtract%.2f_%s", file1.c_str(), Shift, file2.c_str()), "RECREATE");
-  std::string canvname = "FULL_validation_new_";
+  std::string canvname = file1+"FULL_validation_new_";
   stringstream ss;
   ss << "MeanShift_" << meanshift << "_VarShift_" << varshift;
   canvname += ss.str();
@@ -374,6 +366,8 @@ void KevinRecipe(std::string file1, std::string file2, std::string file3) {
   WeightPlot->Reset();
   WeightPlot->SetTitle(Form("FSI Weighting, #mu_{shift}=%.2f #sigma^{2}_{shift}=%.2f", meanshift, varshift));
 
+  int NegativeCounts = 0;
+  int TotalCounts = 0;
   // Loop over each bin
   for (int i = 0; i < NoFSIPlot_C->GetXaxis()->GetNbins(); ++i) {
     for (int j = 0; j < NoFSIPlot_C->GetYaxis()->GetNbins(); ++j) {
@@ -401,11 +395,13 @@ void KevinRecipe(std::string file1, std::string file2, std::string file3) {
 
       // Weighting is a function of Eav/q0 -> Loop over axis
       for (int k = 0; k < FSIPlot1D_Weighted->GetXaxis()->GetNbins(); ++k) {
+        TotalCounts++;
         double xvar = FSIPlot1D_Weighted->GetXaxis()->GetBinCenter(k+1);
         double weight = WeightSecondOrder(xvar, a0, a1, a2);
         if (a0 == -999.99 || a1 == -999.99 || a2 == -999.99) {
           weight = 1.0;
         }
+        if (weight < 0) NegativeCounts++;
 
         double content = FSIPlot1D_Ar->GetBinContent(k+1)*weight;
         if (weight == 0 && FSIPlot1D_C->Integral() > 0 && FSIPlot1D_Ar->Integral() > 0) {
@@ -511,6 +507,8 @@ void KevinRecipe(std::string file1, std::string file2, std::string file3) {
   Output->cd();
   WeightPlot->Write();
   canv->Print((canvname+".pdf]").c_str());
+
+  std::cout << "Found " << NegativeCounts << "/" << TotalCounts << " (" << double(NegativeCounts)/double(TotalCounts)*100.0 << "%) " << "bad events" << std::endl;
 
   Output->Close();
   std::cout << "Wrote " << Output->GetName() << std::endl;
