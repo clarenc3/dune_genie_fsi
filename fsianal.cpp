@@ -68,7 +68,7 @@ double GetMeMyIntegral(TH1D *Hist, int order) {
   return sum;
 }
 
-void fsianal(std::string filename) {
+void fsianal(std::string filename, std::string sel) {
   SetCustomPalette();
   TFile *file = new TFile(filename.c_str(), "OPEN");
   TTree *tree = (TTree*)file->Get("FlatTree_VARS");
@@ -113,13 +113,26 @@ void fsianal(std::string filename) {
   }
   std::cout << "Scalefactor: " << MinScale << std::endl;
 
-  const int nbins = 100;
-  TH3D *plot = new TH3D("q0q3Eav", "q0q3Eav", nbins, 0, 2.0, nbins, 0, 2.0, 24, 0, 1.0);
+  double BinWidth = 50./1000.;
+  double UpperCut = -1.0;
+  if (sel == "CCQE") {
+    UpperCut = 2.0;
+  } else if (sel == "2p2h") {
+    UpperCut = 1.5;
+  } else if (sel == "1pi") {
+    UpperCut = 3.0;
+  } else if (sel == "MpiDIS") {
+    UpperCut = 5.0;
+  }
+
+  int nbins = UpperCut/BinWidth+1;
+  
+  TH3D *plot = new TH3D("q0q3Eav", "q0q3Eav", nbins, 0, UpperCut, nbins, 0, UpperCut, 20, 0, 1.0);
   plot->GetXaxis()->SetTitle("q_{3} (GeV)");
   plot->GetYaxis()->SetTitle("q_{0} (GeV)");
   plot->GetZaxis()->SetTitle("E_{av}/q_{0}");
 
-  TH2D *plot2d = new TH2D("q0q3", "q0q3", nbins, 0, 2.0, nbins, 0, 2.0);
+  TH2D *plot2d = new TH2D("q0q3", "q0q3", nbins, 0, UpperCut, nbins, 0, UpperCut);
   plot2d->GetXaxis()->SetTitle("q_{3} (GeV)");
   plot2d->GetYaxis()->SetTitle("q_{0} (GeV)");
   plot2d->GetZaxis()->SetTitle("d#sigma/dq_{3}dq_{0} (cm^{2}/nucleon/GeV/GeV)");
@@ -127,7 +140,7 @@ void fsianal(std::string filename) {
   const int nModesTotal = 6;
   TH3D *plotMode[nModesTotal];
   for (int i = 0; i < nModesTotal; ++i) {
-    plotMode[i] = new TH3D(Form("q0q3Eav_%i", i), Form("q0q3Eav_%i", i), nbins, 0, 2.0, nbins, 0, 2.0, 24, 0, 1.0);
+    plotMode[i] = new TH3D(Form("q0q3Eav_%i", i), Form("q0q3Eav_%i", i), nbins, 0, UpperCut, nbins, 0, UpperCut, 24, 0, 1.0);
   }
 
   int ncc = 0;
@@ -138,8 +151,20 @@ void fsianal(std::string filename) {
   int nEvents = tree->GetEntries();
   for (int i = 0; i < nEvents; ++i) {
     tree->GetEntry(i);
-    //if (mode < 31 && mode != 16 && Enu > 3.9 && Enu < 4.2) {
-    if (mode < 31 && mode != 16) {
+    // Selection
+    bool CustSel = false;
+    if (UpperCut == 2.0) {
+      CustSel = (mode == 1);
+    } else if (UpperCut == 1.5) {
+      CustSel = (mode == 2);
+    } else if (UpperCut == 3.0) {
+      CustSel = (mode == 11 || mode == 12 || mode == 13);
+    } else if (UpperCut == 5.0) {
+      CustSel = (mode == 21 || mode == 26);
+    }
+    bool Selected = mode < 31 && mode != 16 && CustSel;
+    //if (mode < 31 && mode != 16) {
+    if (Selected) {
       plot->Fill(q3, q0, Eav/q0);
       plot2d->Fill(q3, q0);
       // CCQE
@@ -170,6 +195,15 @@ void fsianal(std::string filename) {
   //std::string canvname = "Flat.root";
   canvname = canvname.substr(0, canvname.find(".root"));
   canvname += "_UpTo1GeV_NoIntCut";
+  if (UpperCut == 2.0) {
+    canvname += "_CCQE";
+  } else if (UpperCut == 1.5) {
+    canvname += "_2p2h";
+  } else if (UpperCut == 3.0) {
+    canvname += "_1pi";
+  } else if (UpperCut == 5.0) {
+    canvname += "_MpiDIS";
+  }
   //canvname += "_Flat";
   TCanvas *canv = new TCanvas("canv", "canv", 1024, 1024);
   canv->SetLeftMargin(canv->GetLeftMargin()*1.25);
@@ -337,12 +371,12 @@ void fsianal(std::string filename) {
     }
   }
   /*
-  std::cout << "Found " << ncc << " with cc flag" << std::endl;
-  std::cout << "Found " << nModes << " with mode flag" << std::endl;
-  std::cout << "Found " << nPDGLep << " with PDGLep flag" << std::endl;
-  std::cout << "Found " << nCCinc << " with nCCinc flag" << std::endl;
-  std::cout << "Total: " << nEvents << std::endl;
-  */
+     std::cout << "Found " << ncc << " with cc flag" << std::endl;
+     std::cout << "Found " << nModes << " with mode flag" << std::endl;
+     std::cout << "Found " << nPDGLep << " with PDGLep flag" << std::endl;
+     std::cout << "Found " << nCCinc << " with nCCinc flag" << std::endl;
+     std::cout << "Total: " << nEvents << std::endl;
+     */
 
   gStyle->SetPalette(55);
   // Now do the Mean and RMS
@@ -405,4 +439,4 @@ void fsianal(std::string filename) {
   OutputFile->Close();
 
   canv->Print((canvname+".pdf]").c_str());
-}
+  }
